@@ -16,7 +16,7 @@ import (
 // driveWith seam with injected loader/analyzer collaborators.
 
 func regWith(a *analysis.Analyzer) Registration {
-	return Registration{Name: a.Name, Analyzer: a}
+	return Registration{Name: AnalyzerName(a.Name), Analyzer: a}
 }
 
 func TestDriveWithHappyPathReturnsResults(t *testing.T) {
@@ -26,7 +26,7 @@ func TestDriveWithHappyPathReturnsResults(t *testing.T) {
 	a := &analysis.Analyzer{Name: "triv"}
 	reg := regWith(a)
 
-	load := func(_ []string) ([]*packages.Package, error) {
+	load := func(_ []Pattern) ([]*packages.Package, error) {
 		return []*packages.Package{{Fset: fset}}, nil
 	}
 	analyze := func(_ []*analysis.Analyzer, _ []*packages.Package) (*checker.Graph, error) {
@@ -35,7 +35,7 @@ func TestDriveWithHappyPathReturnsResults(t *testing.T) {
 		}}, nil
 	}
 
-	gotFset, results, err := driveWith(load, analyze, []Registration{reg}, []string{"./..."})
+	gotFset, results, err := driveWith(load, analyze, []Registration{reg}, []Pattern{"./..."})
 
 	require.NoError(t, err)
 	assert.Same(t, fset, gotFset)
@@ -47,7 +47,7 @@ func TestDriveWithHappyPathReturnsResults(t *testing.T) {
 
 func TestDriveWithReturnsLoadError(t *testing.T) {
 	boom := errs.Const("load failed")
-	load := func(_ []string) ([]*packages.Package, error) { return nil, boom }
+	load := func(_ []Pattern) ([]*packages.Package, error) { return nil, boom }
 	analyze := func(_ []*analysis.Analyzer, _ []*packages.Package) (*checker.Graph, error) {
 		t.Fatal("analyze must not run after a load error")
 		return nil, nil
@@ -60,7 +60,7 @@ func TestDriveWithReturnsLoadError(t *testing.T) {
 
 func TestDriveWithReturnsAnalyzeError(t *testing.T) {
 	boom := errs.Const("analyze failed")
-	load := func(_ []string) ([]*packages.Package, error) {
+	load := func(_ []Pattern) ([]*packages.Package, error) {
 		return []*packages.Package{{Fset: token.NewFileSet()}}, nil
 	}
 	analyze := func(_ []*analysis.Analyzer, _ []*packages.Package) (*checker.Graph, error) { return nil, boom }
@@ -105,7 +105,7 @@ func TestCheckerDriverRunsRealAnalyzerOverThisPackage(t *testing.T) {
 	}
 	reg := regWith(triv)
 
-	fset, results, err := CheckerDriver([]Registration{reg}, []string{"."})
+	fset, results, err := CheckerDriver([]Registration{reg}, []Pattern{"."})
 
 	require.NoError(t, err)
 	require.NotNil(t, fset)

@@ -17,18 +17,25 @@ const (
 // belong to several categories; categories drive filtering and documentation.
 type Category string
 
+// AnalyzerName is an analyzer's stable identifier, used as its rule-id suffix and
+// as the key a Settings map targets.
+type AnalyzerName string
+
+// HelpURL is the documentation URL stamped onto every Diagnostic an analyzer emits.
+type HelpURL string
+
 // Registration declares one analyzer's identity and taxonomy to the framework.
 type Registration struct {
 	Analyzer   *analysis.Analyzer
-	Name       string
-	URL        string
+	Name       AnalyzerName
+	URL        HelpURL
 	Categories []Category
 }
 
 // RuleID returns the stable rule identifier "yze/<name>" carried by every
 // Diagnostic the analyzer emits.
 func (r Registration) RuleID() string {
-	return "yze/" + r.Name
+	return "yze/" + string(r.Name)
 }
 
 // Validate reports the first way a Registration is not well-formed.

@@ -13,7 +13,7 @@ import (
 )
 
 func fakeDriver(fset *token.FileSet, results []goyze.DriverResult, err error) goyze.Driver {
-	return func(_ []goyze.Registration, _ []string) (*token.FileSet, []goyze.DriverResult, error) {
+	return func(_ []goyze.Registration, _ []goyze.Pattern) (*token.FileSet, []goyze.DriverResult, error) {
 		return fset, results, err
 	}
 }
@@ -25,7 +25,7 @@ func TestRunCollectsDiagnosticsFromAllResults(t *testing.T) {
 		{Registration: sampleRegistration(), Diagnostics: nil},
 	}
 
-	report, err := goyze.Run(fakeDriver(fset, results, nil), []goyze.Registration{sampleRegistration()}, []string{"./..."})
+	report, err := goyze.Run(fakeDriver(fset, results, nil), []goyze.Registration{sampleRegistration()}, []goyze.Pattern{"./..."})
 
 	require.NoError(t, err)
 	require.Len(t, report.Diagnostics, 1)
@@ -37,7 +37,7 @@ func TestRunValidatesRegistrationsBeforeDriving(t *testing.T) {
 	bad := sampleRegistration()
 	bad.Name = ""
 	called := false
-	driver := func(_ []goyze.Registration, _ []string) (*token.FileSet, []goyze.DriverResult, error) {
+	driver := func(_ []goyze.Registration, _ []goyze.Pattern) (*token.FileSet, []goyze.DriverResult, error) {
 		called = true
 		return nil, nil, nil
 	}

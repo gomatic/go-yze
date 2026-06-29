@@ -23,7 +23,7 @@ func dummyReg() (goyze.Registration, *string) {
 func TestApplyConfigSetsKnownSettings(t *testing.T) {
 	reg, allow := dummyReg()
 
-	err := goyze.ApplyConfig([]goyze.Registration{reg}, map[string]map[string]string{
+	err := goyze.ApplyConfig([]goyze.Registration{reg}, goyze.Settings{
 		"dummy": {"allow": "pkg.Foo,pkg.Bar"},
 	})
 
@@ -34,7 +34,7 @@ func TestApplyConfigSetsKnownSettings(t *testing.T) {
 func TestApplyConfigIgnoresUnknownAnalyzer(t *testing.T) {
 	reg, _ := dummyReg()
 
-	err := goyze.ApplyConfig([]goyze.Registration{reg}, map[string]map[string]string{
+	err := goyze.ApplyConfig([]goyze.Registration{reg}, goyze.Settings{
 		"other": {"allow": "x"},
 	})
 
@@ -44,21 +44,27 @@ func TestApplyConfigIgnoresUnknownAnalyzer(t *testing.T) {
 func TestApplyConfigRejectsUnknownSetting(t *testing.T) {
 	reg, _ := dummyReg()
 
-	err := goyze.ApplyConfig([]goyze.Registration{reg}, map[string]map[string]string{
+	err := goyze.ApplyConfig([]goyze.Registration{reg}, goyze.Settings{
 		"dummy": {"nope": "x"},
 	})
 
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, goyze.ErrUnknownSetting))
+	// An unknown setting name is NOT an invalid value: the sentinels are distinct.
+	assert.False(t, errors.Is(err, goyze.ErrInvalidSettingValue))
 }
 
 func TestApplyConfigRejectsInvalidValue(t *testing.T) {
 	reg, _ := dummyReg()
 
-	err := goyze.ApplyConfig([]goyze.Registration{reg}, map[string]map[string]string{
+	// "count" IS a supported setting; only its value is bad. The error must name
+	// the value defect, not pretend the setting is unknown.
+	err := goyze.ApplyConfig([]goyze.Registration{reg}, goyze.Settings{
 		"dummy": {"count": "not-a-number"},
 	})
 
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, goyze.ErrUnknownSetting))
+	assert.True(t, errors.Is(err, goyze.ErrInvalidSettingValue))
+	// A bad value for a known setting is NOT an unknown setting.
+	assert.False(t, errors.Is(err, goyze.ErrUnknownSetting))
 }

@@ -106,6 +106,48 @@ func TestApplyEditsWithNoEditsReturnsContentUnchanged(t *testing.T) {
 	assert.Equal(t, "unchanged", string(got))
 }
 
+func TestApplyEditsEqualStartInsertionsAreDeterministic(t *testing.T) {
+	content := []byte("ad")
+	forward := []goyze.TextEdit{
+		{Start: 1, End: 1, NewText: "b"},
+		{Start: 1, End: 1, NewText: "c"},
+	}
+	reverse := []goyze.TextEdit{
+		{Start: 1, End: 1, NewText: "c"},
+		{Start: 1, End: 1, NewText: "b"},
+	}
+
+	gotForward, errForward := goyze.ApplyEdits(content, forward)
+	gotReverse, errReverse := goyze.ApplyEdits(content, reverse)
+
+	require.NoError(t, errForward)
+	require.NoError(t, errReverse)
+	// The total order (NewText breaks a shared Start/End tie) fixes the splice
+	// result regardless of the order the caller supplied the edits in.
+	assert.Equal(t, "abcd", string(gotForward))
+	assert.Equal(t, string(gotForward), string(gotReverse))
+}
+
+func TestApplyEditsEqualStartOverlapIsDeterministic(t *testing.T) {
+	content := []byte("hello")
+	forward := []goyze.TextEdit{
+		{Start: 1, End: 3, NewText: "x"},
+		{Start: 1, End: 4, NewText: "y"},
+	}
+	reverse := []goyze.TextEdit{
+		{Start: 1, End: 4, NewText: "y"},
+		{Start: 1, End: 3, NewText: "x"},
+	}
+
+	_, errForward := goyze.ApplyEdits(content, forward)
+	_, errReverse := goyze.ApplyEdits(content, reverse)
+
+	// Two replacements sharing a Start always overlap, and the verdict is the
+	// same whichever order the caller listed them in.
+	require.ErrorIs(t, errForward, goyze.ErrOverlappingEdits)
+	require.ErrorIs(t, errReverse, goyze.ErrOverlappingEdits)
+}
+
 func TestApplyEditsHandlesPureInsertion(t *testing.T) {
 	content := []byte("ac")
 	edits := []goyze.TextEdit{

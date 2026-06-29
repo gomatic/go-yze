@@ -34,11 +34,25 @@ func ApplyEdits(content []byte, edits []TextEdit) ([]byte, error) {
 	}
 	sorted := make([]TextEdit, len(edits))
 	copy(sorted, edits)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Start < sorted[j].Start })
+	sort.Slice(sorted, func(i, j int) bool { return editLess(sorted[i], sorted[j]) })
 	if err := validateEdits(content, sorted); err != nil {
 		return nil, err
 	}
 	return spliceEdits(content, sorted), nil
+}
+
+// editLess is the total order edits are sorted by: ascending Start, then
+// ascending End, then NewText. A total order (never just Start) makes the
+// overlap verdict and the splice result deterministic when two edits share a
+// Start, where an unstable Start-only sort would otherwise pick either order.
+func editLess(a, b TextEdit) bool {
+	if a.Start != b.Start {
+		return a.Start < b.Start
+	}
+	if a.End != b.End {
+		return a.End < b.End
+	}
+	return a.NewText < b.NewText
 }
 
 // validateEdits checks each edit's bounds and that no two ranges overlap. sorted

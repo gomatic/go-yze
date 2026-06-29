@@ -37,7 +37,7 @@ func TestToDiagnosticMapsPositionAndMetadata(t *testing.T) {
 	assert.Equal(t, 1, got.Col)
 	assert.Equal(t, goyze.SeverityError, got.Severity)
 	assert.Equal(t, "boom", got.Message)
-	assert.Equal(t, reg.URL, got.URL)
+	assert.Equal(t, string(reg.URL), got.URL)
 	assert.Nil(t, got.Fixes)
 	assert.Zero(t, got.EndLine)
 }

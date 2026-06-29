@@ -11,20 +11,30 @@ import (
 // Injected collaborators behind CheckerDriver, so its error and mapping paths are
 // testable without loading real packages.
 type (
-	packageLoader func(patterns []string) ([]*packages.Package, error)
+	packageLoader func(patterns []Pattern) ([]*packages.Package, error)
 	graphAnalyzer func(analyzers []*analysis.Analyzer, pkgs []*packages.Package) (*checker.Graph, error)
 )
 
 // CheckerDriver is the default Driver: it loads the patterns' packages and runs
 // the registered analyzers through the go/analysis checker.
-func CheckerDriver(regs []Registration, patterns []string) (*token.FileSet, []DriverResult, error) {
+func CheckerDriver(regs []Registration, patterns []Pattern) (*token.FileSet, []DriverResult, error) {
 	return driveWith(defaultLoad, defaultAnalyze, regs, patterns)
 }
 
 // defaultLoad loads packages with the full syntax/type information the checker
 // requires.
-func defaultLoad(patterns []string) ([]*packages.Package, error) {
-	return packages.Load(&packages.Config{Mode: packages.LoadAllSyntax}, patterns...)
+func defaultLoad(patterns []Pattern) ([]*packages.Package, error) {
+	return packages.Load(&packages.Config{Mode: packages.LoadAllSyntax}, patternStrings(patterns)...)
+}
+
+// patternStrings projects domain patterns onto the plain strings packages.Load
+// expects.
+func patternStrings(patterns []Pattern) []string {
+	out := make([]string, len(patterns))
+	for i, p := range patterns {
+		out[i] = string(p)
+	}
+	return out
 }
 
 // defaultAnalyze runs the analyzers over the loaded packages.
@@ -34,7 +44,7 @@ func defaultAnalyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package) (*
 
 // driveWith is the testable core of CheckerDriver: load, analyze, then map root
 // actions back to their registrations.
-func driveWith(load packageLoader, analyze graphAnalyzer, regs []Registration, patterns []string) (*token.FileSet, []DriverResult, error) {
+func driveWith(load packageLoader, analyze graphAnalyzer, regs []Registration, patterns []Pattern) (*token.FileSet, []DriverResult, error) {
 	pkgs, err := load(patterns)
 	if err != nil {
 		return nil, nil, err

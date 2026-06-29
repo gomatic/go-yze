@@ -17,14 +17,18 @@ type DriverResult struct {
 	Diagnostics  []analysis.Diagnostic
 }
 
+// Pattern is a package pattern (e.g. "./...") naming the packages an analyzer
+// run targets.
+type Pattern string
+
 // Driver runs the registered analyzers over the given package patterns and
 // returns the shared FileSet plus per-analyzer findings. It is the seam between
 // the framework and a concrete analysis backend (the default is CheckerDriver).
-type Driver func(regs []Registration, patterns []string) (*token.FileSet, []DriverResult, error)
+type Driver func(regs []Registration, patterns []Pattern) (*token.FileSet, []DriverResult, error)
 
 // Run validates the registrations, executes them through the driver, and
 // normalizes every finding into a Report (the native stickler-json model).
-func Run(driver Driver, regs []Registration, patterns []string) (Report, error) {
+func Run(driver Driver, regs []Registration, patterns []Pattern) (Report, error) {
 	if err := validateAll(regs); err != nil {
 		return Report{}, err
 	}

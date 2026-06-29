@@ -57,11 +57,16 @@ func ApplyFixes(read FileReader, write FileWriter, format Formatter, fixes []Fix
 	return result, nil
 }
 
-// groupEdits collects every fix's edits into one slice per target file.
+// groupEdits collects every fix's edits into one slice per target file. A
+// FileEdit carrying no edits is skipped so a no-op fix never creates a file entry
+// (which would otherwise be read, reformatted, and rewritten for no reason).
 func groupEdits(fixes []Fix) map[string][]TextEdit {
 	grouped := map[string][]TextEdit{}
 	for _, fix := range fixes {
 		for _, fe := range fix.Files {
+			if len(fe.Edits) == 0 {
+				continue
+			}
 			grouped[fe.Path] = append(grouped[fe.Path], fe.Edits...)
 		}
 	}

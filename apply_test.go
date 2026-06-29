@@ -130,6 +130,24 @@ func TestApplyFixesReportsWriteError(t *testing.T) {
 	assert.True(t, errors.Is(err, goyze.ErrWriteFile))
 }
 
+func TestApplyFixesSkipsEmptyFileEditWithoutTouchingFile(t *testing.T) {
+	fs := newMemFS(map[string]string{"a.go": "abc"})
+	// A format that errors if ever invoked proves the empty edit short-circuits
+	// before the file is read/reformatted/written.
+	boom := errs.Const("format must not run for an empty FileEdit")
+	failFormat := func(_ []byte) ([]byte, error) { return nil, boom }
+
+	res, err := goyze.ApplyFixes(fs.read, fs.write, failFormat, []goyze.Fix{
+		{Description: "no-op", Files: []goyze.FileEdit{{Path: "a.go"}}},
+	})
+
+	require.NoError(t, err)
+	assert.Zero(t, res.FilesChanged)
+	assert.Zero(t, res.EditsApplied)
+	assert.Empty(t, fs.written)
+	assert.Equal(t, "abc", fs.files["a.go"], "the file must remain byte-identical")
+}
+
 func TestApplyFixesWithNoFixesChangesNothing(t *testing.T) {
 	fs := newMemFS(map[string]string{"a.go": "abc"})
 

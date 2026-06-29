@@ -22,7 +22,7 @@ func ToDiagnostic(fset *token.FileSet, reg Registration, d analysis.Diagnostic) 
 		Col:      start.Column,
 		Severity: SeverityError,
 		Message:  d.Message,
-		URL:      reg.URL,
+		URL:      string(reg.URL),
 		Fixes:    convertFixes(fset, d.SuggestedFixes),
 	}
 	if d.End.IsValid() {
