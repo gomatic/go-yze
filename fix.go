@@ -19,9 +19,9 @@ const (
 // inclusive and End is exclusive (both byte offsets); an edit with Start == End
 // is a pure insertion of NewText.
 type TextEdit struct {
+	NewText string `json:"new_text"`
 	Start   int    `json:"start"`
 	End     int    `json:"end"`
-	NewText string `json:"new_text"`
 }
 
 // ApplyEdits applies edits to content and returns the rewritten bytes. Edits may

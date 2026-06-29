@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	errs "github.com/gomatic/go-error"
-	goyze "github.com/gomatic/go-yze"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	goyze "github.com/gomatic/go-yze"
 )
 
 // memFS is an in-memory filesystem used to drive ApplyFixes without touching disk.
@@ -106,7 +107,7 @@ func TestApplyFixesPropagatesOverlapError(t *testing.T) {
 func TestApplyFixesReportsFormatError(t *testing.T) {
 	fs := newMemFS(map[string]string{"a.go": "abc"})
 	boom := errs.Const("boom")
-	failFormat := func(src []byte) ([]byte, error) { return nil, boom }
+	failFormat := func(_ []byte) ([]byte, error) { return nil, boom }
 
 	_, err := goyze.ApplyFixes(fs.read, fs.write, failFormat, []goyze.Fix{
 		fix("a.go", goyze.TextEdit{Start: 0, End: 1, NewText: "X"}),
@@ -119,7 +120,7 @@ func TestApplyFixesReportsFormatError(t *testing.T) {
 func TestApplyFixesReportsWriteError(t *testing.T) {
 	fs := newMemFS(map[string]string{"a.go": "abc"})
 	boom := errs.Const("disk full")
-	failWrite := func(path string, data []byte) error { return boom }
+	failWrite := func(_ string, _ []byte) error { return boom }
 
 	_, err := goyze.ApplyFixes(fs.read, failWrite, identityFormat, []goyze.Fix{
 		fix("a.go", goyze.TextEdit{Start: 0, End: 1, NewText: "X"}),

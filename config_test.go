@@ -4,23 +4,24 @@ import (
 	"errors"
 	"testing"
 
-	goyze "github.com/gomatic/go-yze"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/go/analysis"
+
+	goyze "github.com/gomatic/go-yze"
 )
 
-func dummyReg() (goyze.Registration, *string, *int) {
+func dummyReg() (goyze.Registration, *string) {
 	a := &analysis.Analyzer{Name: "dummy"}
 	var allow string
 	var count int
 	a.Flags.StringVar(&allow, "allow", "", "")
 	a.Flags.IntVar(&count, "count", 0, "")
-	return goyze.Registration{Name: "dummy", Group: "go", Analyzer: a}, &allow, &count
+	return goyze.Registration{Name: "dummy", Analyzer: a}, &allow
 }
 
 func TestApplyConfigSetsKnownSettings(t *testing.T) {
-	reg, allow, _ := dummyReg()
+	reg, allow := dummyReg()
 
 	err := goyze.ApplyConfig([]goyze.Registration{reg}, map[string]map[string]string{
 		"dummy": {"allow": "pkg.Foo,pkg.Bar"},
@@ -31,7 +32,7 @@ func TestApplyConfigSetsKnownSettings(t *testing.T) {
 }
 
 func TestApplyConfigIgnoresUnknownAnalyzer(t *testing.T) {
-	reg, _, _ := dummyReg()
+	reg, _ := dummyReg()
 
 	err := goyze.ApplyConfig([]goyze.Registration{reg}, map[string]map[string]string{
 		"other": {"allow": "x"},
@@ -41,7 +42,7 @@ func TestApplyConfigIgnoresUnknownAnalyzer(t *testing.T) {
 }
 
 func TestApplyConfigRejectsUnknownSetting(t *testing.T) {
-	reg, _, _ := dummyReg()
+	reg, _ := dummyReg()
 
 	err := goyze.ApplyConfig([]goyze.Registration{reg}, map[string]map[string]string{
 		"dummy": {"nope": "x"},
@@ -52,7 +53,7 @@ func TestApplyConfigRejectsUnknownSetting(t *testing.T) {
 }
 
 func TestApplyConfigRejectsInvalidValue(t *testing.T) {
-	reg, _, _ := dummyReg()
+	reg, _ := dummyReg()
 
 	err := goyze.ApplyConfig([]goyze.Registration{reg}, map[string]map[string]string{
 		"dummy": {"count": "not-a-number"},

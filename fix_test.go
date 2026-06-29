@@ -4,9 +4,10 @@ import (
 	"errors"
 	"testing"
 
-	goyze "github.com/gomatic/go-yze"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	goyze "github.com/gomatic/go-yze"
 )
 
 func TestApplyEditsReplacesSingleRange(t *testing.T) {

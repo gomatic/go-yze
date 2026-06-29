@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	errs "github.com/gomatic/go-error"
-	goyze "github.com/gomatic/go-yze"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/go/analysis"
+
+	goyze "github.com/gomatic/go-yze"
 )
 
 func fakeDriver(fset *token.FileSet, results []goyze.DriverResult, err error) goyze.Driver {
@@ -28,7 +29,7 @@ func TestRunCollectsDiagnosticsFromAllResults(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, report.Diagnostics, 1)
-	assert.Equal(t, "yze/go/errconst", report.Diagnostics[0].Rule)
+	assert.Equal(t, "yze/errconst", report.Diagnostics[0].Rule)
 	assert.Equal(t, "boom", report.Diagnostics[0].Message)
 }
 

@@ -27,14 +27,14 @@ type Diagnostic struct {
 	Tool     string   `json:"tool"`
 	Rule     string   `json:"rule"`
 	Path     string   `json:"path"`
+	Severity Severity `json:"severity"`
+	Message  string   `json:"message"`
+	URL      string   `json:"url,omitempty"`
+	Fixes    []Fix    `json:"fixes,omitempty"`
 	Line     int      `json:"line"`
 	Col      int      `json:"col"`
 	EndLine  int      `json:"end_line,omitempty"`
 	EndCol   int      `json:"end_col,omitempty"`
-	Severity Severity `json:"severity"`
-	Message  string   `json:"message"`
-	Fixes    []Fix    `json:"fixes,omitempty"`
-	URL      string   `json:"url,omitempty"`
 }
 
 // Fix is a named, mechanically-applicable change attached to a Diagnostic. It is

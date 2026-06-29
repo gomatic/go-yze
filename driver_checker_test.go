@@ -16,7 +16,7 @@ import (
 // driveWith seam with injected loader/analyzer collaborators.
 
 func regWith(a *analysis.Analyzer) Registration {
-	return Registration{Name: a.Name, Group: "go", Analyzer: a}
+	return Registration{Name: a.Name, Analyzer: a}
 }
 
 func TestDriveWithHappyPathReturnsResults(t *testing.T) {

@@ -4,10 +4,11 @@ import (
 	"go/token"
 	"testing"
 
-	goyze "github.com/gomatic/go-yze"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/go/analysis"
+
+	goyze "github.com/gomatic/go-yze"
 )
 
 const convSrc = "package p\n\nfunc f() {}\n"
@@ -30,7 +31,7 @@ func TestToDiagnosticMapsPositionAndMetadata(t *testing.T) {
 	})
 
 	assert.Equal(t, "yze", got.Tool)
-	assert.Equal(t, "yze/go/errconst", got.Rule)
+	assert.Equal(t, "yze/errconst", got.Rule)
 	assert.Equal(t, "foo.go", got.Path)
 	assert.Equal(t, 1, got.Line)
 	assert.Equal(t, 1, got.Col)

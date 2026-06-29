@@ -5,9 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	goyze "github.com/gomatic/go-yze"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	goyze "github.com/gomatic/go-yze"
 )
 
 func sampleReport() goyze.Report {
@@ -15,7 +16,7 @@ func sampleReport() goyze.Report {
 		Diagnostics: []goyze.Diagnostic{
 			{
 				Tool:     "yze",
-				Rule:     "yze/go/errconst",
+				Rule:     "yze/errconst",
 				Path:     "pkg/foo/foo.go",
 				Line:     12,
 				Col:      5,
@@ -23,7 +24,7 @@ func sampleReport() goyze.Report {
 				EndCol:   20,
 				Severity: goyze.SeverityError,
 				Message:  "use a sentinel Error constant",
-				URL:      "https://docs.gomatic.dev/yze/go/errconst",
+				URL:      "https://docs.gomatic.dev/yze/errconst",
 				Fixes: []goyze.Fix{
 					{
 						Description: "convert to errs.Const",
