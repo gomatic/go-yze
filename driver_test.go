@@ -25,7 +25,11 @@ func TestRunCollectsDiagnosticsFromAllResults(t *testing.T) {
 		{Registration: sampleRegistration(), Diagnostics: nil},
 	}
 
-	report, err := goyze.Run(fakeDriver(fset, results, nil), []goyze.Registration{sampleRegistration()}, []goyze.Pattern{"./..."})
+	report, err := goyze.Run(
+		fakeDriver(fset, results, nil),
+		[]goyze.Registration{sampleRegistration()},
+		[]goyze.Pattern{"./..."},
+	)
 
 	require.NoError(t, err)
 	require.Len(t, report.Diagnostics, 1)

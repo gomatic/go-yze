@@ -30,8 +30,10 @@ func sampleReport() goyze.Report {
 						Description: "convert to errs.Const",
 						Files: []goyze.FileEdit{
 							{
-								Path:  "pkg/foo/foo.go",
-								Edits: []goyze.TextEdit{{Start: 100, End: 130, NewText: "const ErrX errs.Const = \"x\""}},
+								Path: "pkg/foo/foo.go",
+								Edits: []goyze.TextEdit{
+									{Start: 100, End: 130, NewText: "const ErrX errs.Const = \"x\""},
+								},
 							},
 						},
 					},

@@ -44,7 +44,12 @@ func defaultAnalyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package) (*
 
 // driveWith is the testable core of CheckerDriver: load, analyze, then map root
 // actions back to their registrations.
-func driveWith(load packageLoader, analyze graphAnalyzer, regs []Registration, patterns []Pattern) (*token.FileSet, []DriverResult, error) {
+func driveWith(
+	load packageLoader,
+	analyze graphAnalyzer,
+	regs []Registration,
+	patterns []Pattern,
+) (*token.FileSet, []DriverResult, error) {
 	pkgs, err := load(patterns)
 	if err != nil {
 		return nil, nil, err
