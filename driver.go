@@ -53,11 +53,11 @@ func validateAll(regs []Registration) error {
 // dropping findings in generated files (see generated.go).
 func collect(fset *token.FileSet, results []DriverResult) Report {
 	report := Report{}
-	generated := generatedFiles{read: osReadHead, seen: map[string]bool{}}
+	generated := generatedFiles{read: osReadHead, seen: map[filePath]bool{}}
 	for _, res := range results {
 		for _, d := range res.Diagnostics {
 			diag := ToDiagnostic(fset, res.Registration, d)
-			if generated.isGenerated(diag.Path) {
+			if generated.isGenerated(filePath(diag.Path)) {
 				continue
 			}
 			report.Diagnostics = append(report.Diagnostics, diag)

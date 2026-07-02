@@ -19,12 +19,12 @@ var generatedMarker = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.$`)
 
 // readHead reads a file's opening bytes; injected so tests drive the decision
 // without a real tree.
-type readHead func(path string) ([]byte, error)
+type readHead func(path filePath) ([]byte, error)
 
 // osReadHead reads up to the first 4KiB of a file — the marker precedes the
 // package clause, comfortably within the head.
-func osReadHead(path string) ([]byte, error) {
-	f, err := os.Open(path)
+func osReadHead(path filePath) ([]byte, error) {
+	f, err := os.Open(string(path))
 	if err != nil {
 		return nil, err
 	}
@@ -40,13 +40,13 @@ func osReadHead(path string) ([]byte, error) {
 // generatedFiles memoizes per-path generated-marker checks across one report.
 type generatedFiles struct {
 	read readHead
-	seen map[string]bool
+	seen map[filePath]bool
 }
 
 // isGenerated reports whether the file at path carries the generated marker.
 // An unreadable file is not generated (the diagnostic survives; better a
 // spurious finding than a silently dropped one).
-func (g generatedFiles) isGenerated(path string) bool {
+func (g generatedFiles) isGenerated(path filePath) bool {
 	if verdict, ok := g.seen[path]; ok {
 		return verdict
 	}
@@ -55,7 +55,7 @@ func (g generatedFiles) isGenerated(path string) bool {
 	return verdict
 }
 
-func (g generatedFiles) check(path string) bool {
+func (g generatedFiles) check(path filePath) bool {
 	head, err := g.read(path)
 	if err != nil {
 		return false
