@@ -49,12 +49,18 @@ func validateAll(regs []Registration) error {
 	return nil
 }
 
-// collect normalizes every driver result's diagnostics into one Report.
+// collect normalizes every driver result's diagnostics into one Report,
+// dropping findings in generated files (see generated.go).
 func collect(fset *token.FileSet, results []DriverResult) Report {
 	report := Report{}
+	generated := generatedFiles{read: osReadHead, seen: map[string]bool{}}
 	for _, res := range results {
 		for _, d := range res.Diagnostics {
-			report.Diagnostics = append(report.Diagnostics, ToDiagnostic(fset, res.Registration, d))
+			diag := ToDiagnostic(fset, res.Registration, d)
+			if generated.isGenerated(diag.Path) {
+				continue
+			}
+			report.Diagnostics = append(report.Diagnostics, diag)
 		}
 	}
 	return report
