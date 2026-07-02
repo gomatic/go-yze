@@ -35,9 +35,14 @@ func CheckerDriver(regs []Registration, patterns []Pattern) (*token.FileSet, []D
 }
 
 // defaultLoad loads packages with the full syntax/type information the checker
-// requires.
+// requires, plus module identity (NeedModule) so analyzers can distinguish the
+// analyzed module's own types from foreign ones (ptrparam's foreign-convention
+// rule reads pass.Module).
 func defaultLoad(patterns []Pattern) ([]*packages.Package, error) {
-	return packages.Load(&packages.Config{Mode: packages.LoadAllSyntax}, patternStrings(patterns)...)
+	return packages.Load(
+		&packages.Config{Mode: packages.LoadAllSyntax | packages.NeedModule},
+		patternStrings(patterns)...,
+	)
 }
 
 // patternStrings projects domain patterns onto the plain strings packages.Load
