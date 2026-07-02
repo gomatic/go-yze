@@ -48,7 +48,7 @@ func ApplyFixes(read FileReader, write FileWriter, format Formatter, fixes []Fix
 	result := FixResult{}
 	for _, path := range sortedPaths(grouped) {
 		edits := grouped[path]
-		if err := applyFileFixes(read, write, format, path, edits); err != nil {
+		if err := applyFileFixes(read, write, format, pathParam(path), edits); err != nil {
 			return FixResult{}, err
 		}
 		result.FilesChanged++
@@ -73,11 +73,14 @@ func groupEdits(fixes []Fix) map[string][]TextEdit {
 	return grouped
 }
 
+// pathParam names the path parameter of applyFileFixes; rename it to the real domain concept.
+type pathParam string
+
 // applyFileFixes rewrites a single file with its merged edits.
-func applyFileFixes(read FileReader, write FileWriter, format Formatter, path string, edits []TextEdit) error {
-	content, err := read(path)
+func applyFileFixes(read FileReader, write FileWriter, format Formatter, path pathParam, edits []TextEdit) error {
+	content, err := read(string(path))
 	if err != nil {
-		return ErrReadFile.With(err, "path", path)
+		return ErrReadFile.With(err, "path", string(path))
 	}
 	edited, err := ApplyEdits(content, edits)
 	if err != nil {
@@ -85,10 +88,10 @@ func applyFileFixes(read FileReader, write FileWriter, format Formatter, path st
 	}
 	formatted, err := format(edited)
 	if err != nil {
-		return ErrFormat.With(err, "path", path)
+		return ErrFormat.With(err, "path", string(path))
 	}
-	if err := write(path, formatted); err != nil {
-		return ErrWriteFile.With(err, "path", path)
+	if err := write(string(path), formatted); err != nil {
+		return ErrWriteFile.With(err, "path", string(path))
 	}
 	return nil
 }

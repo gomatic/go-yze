@@ -22,7 +22,7 @@ type VerifyIssue struct {
 // String renders the issue as "file:line:col: message", or just the message
 // when the issue carries no position.
 func (i VerifyIssue) String() string {
-	if file := issueFile(i.Pos); file == "" {
+	if file := issueFile(posParam(i.Pos)); file == "" {
 		return i.Msg
 	}
 	return i.Pos + ": " + i.Msg
@@ -42,21 +42,24 @@ func (r VerifyResult) Clean() bool { return len(r.Issues) == 0 }
 func (r VerifyResult) Files() int {
 	files := map[string]struct{}{}
 	for _, issue := range r.Issues {
-		files[issueFile(issue.Pos)] = struct{}{}
+		files[issueFile(posParam(issue.Pos))] = struct{}{}
 	}
 	return len(files)
 }
 
+// posParam names the pos parameter of issueFile; rename it to the real domain concept.
+type posParam string
+
 // issueFile extracts the file part of a loader position ("file:line:col"),
 // returning "" for a positionless issue.
-func issueFile(pos string) string {
-	if pos == "-" {
+func issueFile(pos posParam) string {
+	if string(pos) == "-" {
 		return ""
 	}
-	if i := strings.Index(pos, ":"); i >= 0 {
-		return pos[:i]
+	if i := strings.Index(string(pos), ":"); i >= 0 {
+		return string(pos)[:i]
 	}
-	return pos
+	return string(pos)
 }
 
 // Verifier reloads the given package patterns — test files included — and
