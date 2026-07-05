@@ -21,6 +21,13 @@ import (
 // "directory prefix . does not contain modules listed in go.work" list error.
 const ErrLoadPackages errs.Const = "failed to load packages"
 
+// ErrAnalyzer reports an analyzer whose Run returned an error. The checker
+// records a failed Run on its action (Action.Err) rather than failing
+// Analyze — whose own error covers only setup — so without this gate a failed
+// analyzer silently contributes zero diagnostics and the run degrades to a
+// false pass, the same failure mode ErrLoadPackages guards against.
+const ErrAnalyzer errs.Const = "analyzer failed"
+
 // Injected collaborators behind CheckerDriver, so its error and mapping paths are
 // testable without loading real packages.
 type (
@@ -80,7 +87,36 @@ func driveWith(
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := analyzerError(graph); err != nil {
+		return nil, nil, err
+	}
 	return fsetOf(pkgs), rootResults(graph, byAnalyzer), nil
+}
+
+// analyzerError reports the first root action whose analysis failed. A root
+// carrying only the checker's synthetic "failed prerequisites" error is
+// drilled down to the dependency action whose own Run produced the failure,
+// so the analyzer named and the cause wrapped are the real ones.
+func analyzerError(graph *checker.Graph) error {
+	for _, act := range graph.Roots {
+		if act.Err != nil {
+			fail := failedAction(act)
+			return ErrAnalyzer.With(fail.Err, "analyzer", fail.Analyzer.Name)
+		}
+	}
+	return nil
+}
+
+// failedAction walks a failed action's dependencies to the deepest failed
+// action — the one whose own Run returned the error rather than inheriting a
+// prerequisite's failure.
+func failedAction(act *checker.Action) *checker.Action {
+	for _, dep := range act.Deps {
+		if dep.Err != nil {
+			return failedAction(dep)
+		}
+	}
+	return act
 }
 
 // maxLoadErrors caps how many loader errors are echoed in the failure message;

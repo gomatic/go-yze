@@ -57,7 +57,9 @@ func ApplyFixes(read FileReader, write FileWriter, format Formatter, fixes []Fix
 	return result, nil
 }
 
-// groupEdits collects every fix's edits into one slice per target file. A
+// groupEdits collects every fix's edits into one slice per target file,
+// dropping exact duplicates (different fixes may propose the identical edit)
+// so they neither abort as overlapping nor inflate the applied-edit count. A
 // FileEdit carrying no edits is skipped so a no-op fix never creates a file entry
 // (which would otherwise be read, reformatted, and rewritten for no reason).
 func groupEdits(fixes []Fix) map[string][]TextEdit {
@@ -69,6 +71,9 @@ func groupEdits(fixes []Fix) map[string][]TextEdit {
 			}
 			grouped[fe.Path] = append(grouped[fe.Path], fe.Edits...)
 		}
+	}
+	for path, edits := range grouped {
+		grouped[path] = dedupeEdits(edits)
 	}
 	return grouped
 }

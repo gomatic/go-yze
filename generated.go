@@ -7,6 +7,8 @@ package goyze
 
 import (
 	"bufio"
+	"errors"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -21,20 +23,33 @@ var generatedMarker = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.$`)
 // without a real tree.
 type readHead func(path filePath) ([]byte, error)
 
-// osReadHead reads up to the first 4KiB of a file — the marker precedes the
-// package clause, comfortably within the head.
+// osReadHead reads a file's preamble — every line through the package clause —
+// however long the license header before it runs.
 func osReadHead(path filePath) ([]byte, error) {
 	f, err := os.Open(string(path))
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	head := make([]byte, 4096)
-	n, err := bufio.NewReader(f).Read(head)
-	if n > 0 {
-		return head[:n], nil
+	return readThroughPackageClause(f)
+}
+
+// readThroughPackageClause accumulates r's lines up to and including the
+// package clause (or EOF, whichever comes first) — the whole region where the
+// generated marker may legally appear, per ast.IsGenerated's semantics.
+func readThroughPackageClause(r io.Reader) ([]byte, error) {
+	br := bufio.NewReader(r)
+	var head []byte
+	for {
+		line, err := br.ReadString('\n')
+		head = append(head, line...)
+		if strings.HasPrefix(line, "package ") || errors.Is(err, io.EOF) {
+			return head, nil
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
-	return nil, err
 }
 
 // generatedFiles memoizes per-path generated-marker checks across one report.

@@ -197,6 +197,85 @@ func TestLoadErrorsWalksImportsInSortedPathOrder(t *testing.T) {
 	assert.Equal(t, "zed", got[1].Msg)
 }
 
+func TestDriveWithFailsWhenRootActionErrs(t *testing.T) {
+	runErr := errs.Const("probe exploded")
+	a := &analysis.Analyzer{Name: "probe"}
+	analyze := func(_ []*analysis.Analyzer, _ []*packages.Package) (*checker.Graph, error) {
+		return &checker.Graph{Roots: []*checker.Action{{Analyzer: a, Err: runErr}}}, nil
+	}
+
+	_, _, err := driveWith(
+		loadOf(&packages.Package{Fset: token.NewFileSet()}), analyze, []Registration{regWith(a)}, []Pattern{"./..."})
+
+	require.ErrorIs(t, err, ErrAnalyzer)
+	require.ErrorIs(t, err, runErr, "the analyzer's own Run error must stay matchable through the sentinel")
+	assert.Contains(t, err.Error(), "probe", "the failing analyzer must be named")
+}
+
+func TestDriveWithFailsWhenDependencyActionErrs(t *testing.T) {
+	depErr := errs.Const("inspector exploded")
+	healthy := &checker.Action{Analyzer: &analysis.Analyzer{Name: "healthy"}}
+	dep := &checker.Action{Analyzer: &analysis.Analyzer{Name: "inspect"}, Err: depErr}
+	root := &checker.Action{
+		Analyzer: &analysis.Analyzer{Name: "parent"},
+		// The checker stamps a synthetic "failed prerequisites" error on the
+		// root; the real cause lives on the failed dependency action.
+		Err:  errs.Const("failed prerequisites: inspect@p"),
+		Deps: []*checker.Action{healthy, dep},
+	}
+	analyze := func(_ []*analysis.Analyzer, _ []*packages.Package) (*checker.Graph, error) {
+		return &checker.Graph{Roots: []*checker.Action{root}}, nil
+	}
+
+	_, _, err := driveWith(
+		loadOf(&packages.Package{Fset: token.NewFileSet()}),
+		analyze, []Registration{regWith(root.Analyzer)}, []Pattern{"./..."})
+
+	require.ErrorIs(t, err, ErrAnalyzer)
+	require.ErrorIs(t, err, depErr, "the failed dependency's own error is the cause")
+	assert.Contains(t, err.Error(), "inspect", "the analyzer blamed is the one whose Run actually failed")
+}
+
+func TestCheckerDriverFailsWhenAnalyzerRunErrs(t *testing.T) {
+	runErr := errs.Const("probe run failed")
+	probe := &analysis.Analyzer{
+		Name: "proberr",
+		Doc:  "always fails",
+		Run:  func(*analysis.Pass) (any, error) { return nil, runErr },
+	}
+
+	_, _, err := CheckerDriver([]Registration{regWith(probe)}, []Pattern{"."})
+
+	require.ErrorIs(t, err, ErrAnalyzer, "a failed Run must never degrade to a clean pass")
+	require.ErrorIs(t, err, runErr)
+	assert.Contains(t, err.Error(), "proberr")
+}
+
+func TestCheckerDriverFailsWhenRequiredAnalyzerRunErrs(t *testing.T) {
+	depErr := errs.Const("required analyzer failed")
+	child := &analysis.Analyzer{
+		Name: "childerr",
+		Doc:  "always fails",
+		Run:  func(*analysis.Pass) (any, error) { return nil, depErr },
+	}
+	parent := &analysis.Analyzer{
+		Name:     "parenterr",
+		Doc:      "requires childerr",
+		Requires: []*analysis.Analyzer{child},
+		Run:      func(*analysis.Pass) (any, error) { return nil, nil },
+	}
+
+	_, _, err := CheckerDriver([]Registration{regWith(parent)}, []Pattern{"."})
+
+	// Verified against x/tools v0.47.0 (checker.go execOnce): a failed
+	// dependency IS reflected on the root action as a synthetic "failed
+	// prerequisites" error, so scanning graph.Roots suffices to fail the run;
+	// the dependency walk recovers the real cause and analyzer name.
+	require.ErrorIs(t, err, ErrAnalyzer)
+	require.ErrorIs(t, err, depErr, "the required analyzer's own error is the cause")
+	assert.Contains(t, err.Error(), "childerr", "the dependency whose Run failed must be named")
+}
+
 func TestRootResultsSkipsUnregisteredAnalyzers(t *testing.T) {
 	known := &analysis.Analyzer{Name: "known"}
 	foreign := &analysis.Analyzer{Name: "foreign"}

@@ -81,6 +81,20 @@ func TestApplyFixesAcrossMultipleFiles(t *testing.T) {
 	assert.Equal(t, "bbY", fs.written["b.go"])
 }
 
+func TestApplyFixesDedupesIdenticalEditsAcrossFixes(t *testing.T) {
+	fs := newMemFS(map[string]string{"a.go": "hello world"})
+
+	res, err := goyze.ApplyFixes(fs.read, fs.write, identityFormat, []goyze.Fix{
+		fix("a.go", goyze.TextEdit{Start: 6, End: 11, NewText: "gophers"}),
+		fix("a.go", goyze.TextEdit{Start: 6, End: 11, NewText: "gophers"}),
+	})
+
+	require.NoError(t, err, "two fixes proposing the identical edit must not abort as overlapping")
+	assert.Equal(t, 1, res.FilesChanged)
+	assert.Equal(t, 1, res.EditsApplied, "a deduplicated edit counts once")
+	assert.Equal(t, "hello gophers", fs.written["a.go"])
+}
+
 func TestApplyFixesReportsReadError(t *testing.T) {
 	fs := newMemFS(map[string]string{})
 

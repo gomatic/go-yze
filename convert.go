@@ -60,7 +60,7 @@ func convertEdits(fset *token.FileSet, edits []analysis.TextEdit) []FileEdit {
 		}
 		byPath[start.Filename] = append(byPath[start.Filename], TextEdit{
 			Start:   start.Offset,
-			End:     fset.Position(e.End).Offset,
+			End:     fset.Position(editEnd(e)).Offset,
 			NewText: string(e.NewText),
 		})
 	}
@@ -69,4 +69,16 @@ func convertEdits(fset *token.FileSet, edits []analysis.TextEdit) []FileEdit {
 		out = append(out, FileEdit{Path: path, Edits: byPath[path]})
 	}
 	return out
+}
+
+// editEnd resolves an edit's end position: analysis.TextEdit permits End ==
+// token.NoPos for a pure insertion ("End can either be set to Pos or
+// token.NoPos"), and resolving NoPos through the FileSet yields offset 0 — an
+// inverted range that would abort the whole fix. An invalid End means End =
+// Pos, mirroring ToDiagnostic's handling of an invalid d.End.
+func editEnd(e analysis.TextEdit) token.Pos {
+	if e.End.IsValid() {
+		return e.End
+	}
+	return e.Pos
 }

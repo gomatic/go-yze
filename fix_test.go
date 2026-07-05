@@ -148,6 +148,44 @@ func TestApplyEditsEqualStartOverlapIsDeterministic(t *testing.T) {
 	require.ErrorIs(t, errReverse, goyze.ErrOverlappingEdits)
 }
 
+func TestApplyEditsDedupesIdenticalRangedEdits(t *testing.T) {
+	content := []byte("hello")
+	edits := []goyze.TextEdit{
+		{Start: 1, End: 3, NewText: "X"},
+		{Start: 1, End: 3, NewText: "X"},
+	}
+
+	got, err := goyze.ApplyEdits(content, edits)
+
+	require.NoError(t, err, "two identical edits are one edit, not an overlap")
+	assert.Equal(t, "hXlo", string(got))
+}
+
+func TestApplyEditsDedupesIdenticalInsertions(t *testing.T) {
+	content := []byte("ac")
+	edits := []goyze.TextEdit{
+		{Start: 1, End: 1, NewText: "b"},
+		{Start: 1, End: 1, NewText: "b"},
+	}
+
+	got, err := goyze.ApplyEdits(content, edits)
+
+	require.NoError(t, err)
+	assert.Equal(t, "abc", string(got), "an identical insertion applies once, never twice")
+}
+
+func TestApplyEditsStillRejectsDistinctEditsSharingARange(t *testing.T) {
+	content := []byte("hello")
+	edits := []goyze.TextEdit{
+		{Start: 1, End: 3, NewText: "X"},
+		{Start: 1, End: 3, NewText: "Y"},
+	}
+
+	_, err := goyze.ApplyEdits(content, edits)
+
+	require.ErrorIs(t, err, goyze.ErrOverlappingEdits, "dedup covers exact duplicates only")
+}
+
 func TestApplyEditsHandlesPureInsertion(t *testing.T) {
 	content := []byte("ac")
 	edits := []goyze.TextEdit{

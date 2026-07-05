@@ -55,6 +55,26 @@ func TestToDiagnosticSetsEndWhenValid(t *testing.T) {
 	assert.Equal(t, 5, got.EndCol)
 }
 
+func TestToDiagnosticInsertionEditWithInvalidEnd(t *testing.T) {
+	fset, f := newFile(t)
+
+	got := goyze.ToDiagnostic(fset, sampleRegistration(), analysis.Diagnostic{
+		Pos:     f.Pos(0),
+		Message: "boom",
+		SuggestedFixes: []analysis.SuggestedFix{{
+			Message:   "insert",
+			TextEdits: []analysis.TextEdit{{Pos: f.Pos(5), End: token.NoPos, NewText: []byte("x")}},
+		}},
+	})
+
+	require.Len(t, got.Fixes, 1)
+	require.Len(t, got.Fixes[0].Files, 1)
+	// analysis.TextEdit permits End == token.NoPos for a pure insertion ("End
+	// can either be set to Pos or token.NoPos"); an invalid End means End =
+	// Pos, never offset 0 (which would invert the range and abort the fix).
+	assert.Equal(t, []goyze.TextEdit{{Start: 5, End: 5, NewText: "x"}}, got.Fixes[0].Files[0].Edits)
+}
+
 func TestToDiagnosticConvertsSuggestedFixesGroupedByFile(t *testing.T) {
 	fset, f := newFile(t)
 

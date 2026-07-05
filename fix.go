@@ -25,20 +25,38 @@ type TextEdit struct {
 }
 
 // ApplyEdits applies edits to content and returns the rewritten bytes. Edits may
-// be supplied in any order; they are applied as one atomic batch. It reports
-// ErrEditOutOfBounds for a range outside content (or an inverted range) and
-// ErrOverlappingEdits when two ranges intersect. content is never mutated.
+// be supplied in any order; exact duplicates collapse to one edit, and the rest
+// are applied as one atomic batch. It reports ErrEditOutOfBounds for a range
+// outside content (or an inverted range) and ErrOverlappingEdits when two
+// distinct ranges intersect. content is never mutated.
 func ApplyEdits(content []byte, edits []TextEdit) ([]byte, error) {
 	if len(edits) == 0 {
 		return content, nil
 	}
-	sorted := make([]TextEdit, len(edits))
-	copy(sorted, edits)
+	sorted := dedupeEdits(edits)
 	sort.Slice(sorted, func(i, j int) bool { return editLess(sorted[i], sorted[j]) })
 	if err := validateEdits(content, sorted); err != nil {
 		return nil, err
 	}
 	return spliceEdits(content, sorted), nil
+}
+
+// dedupeEdits returns a fresh copy of edits with exact duplicates (same range
+// and replacement text) removed, preserving first-seen order. Independent
+// analyzers may propose the identical edit: without deduplication two
+// identical ranged edits would abort as overlapping, and two identical pure
+// insertions would both apply (a double insert).
+func dedupeEdits(edits []TextEdit) []TextEdit {
+	seen := make(map[TextEdit]struct{}, len(edits))
+	out := make([]TextEdit, 0, len(edits))
+	for _, e := range edits {
+		if _, dup := seen[e]; dup {
+			continue
+		}
+		seen[e] = struct{}{}
+		out = append(out, e)
+	}
+	return out
 }
 
 // editLess is the total order edits are sorted by: ascending Start, then
