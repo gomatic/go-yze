@@ -47,3 +47,18 @@ func TestRegistrationValidateRejectsMissingAnalyzer(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, goyze.ErrMissingAnalyzer))
 }
+
+// TestWithTestScopeCopiesRatherThanMutates pins that a catalog can declare the
+// test-file policy centrally without altering the analyzer package's own
+// registration value.
+func TestWithTestScopeCopiesRatherThanMutates(t *testing.T) {
+	t.Parallel()
+
+	original := goyze.Registration{Name: "thing", Analyzer: &analysis.Analyzer{Name: "thing"}}
+
+	scoped := original.WithTestScope(goyze.TestScopeSourceOnly)
+
+	assert.Equal(t, goyze.TestScopeSourceOnly, scoped.TestScope)
+	assert.Equal(t, goyze.TestScopeAll, original.TestScope, "the original is unchanged")
+	assert.Equal(t, original.Name, scoped.Name)
+}

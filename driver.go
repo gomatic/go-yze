@@ -2,6 +2,7 @@ package goyze
 
 import (
 	"go/token"
+	"strings"
 
 	errs "github.com/gomatic/go-error"
 	"golang.org/x/tools/go/analysis"
@@ -49,6 +50,12 @@ func validateAll(regs []Registration) error {
 	return nil
 }
 
+// outOfScope reports whether a finding falls outside its analyzer's declared
+// test scope — a source-only rule reporting inside a _test.go file.
+func outOfScope(reg Registration, diag Diagnostic) bool {
+	return reg.TestScope == TestScopeSourceOnly && strings.HasSuffix(diag.Path, "_test.go")
+}
+
 // diagnosticKey identifies a finding for deduplication. The loader presents a
 // package's non-test files in both the plain package and its test variant (see
 // defaultLoad), so an analyzer reporting on those files produces the identical
@@ -85,7 +92,7 @@ func kept(fset *token.FileSet, res DriverResult, generated generatedFiles, seen 
 	out := make([]Diagnostic, 0, len(res.Diagnostics))
 	for _, d := range res.Diagnostics {
 		diag := ToDiagnostic(fset, res.Registration, d)
-		if generated.isGenerated(filePath(diag.Path)) || seen[keyOf(diag)] {
+		if outOfScope(res.Registration, diag) || generated.isGenerated(filePath(diag.Path)) || seen[keyOf(diag)] {
 			continue
 		}
 		seen[keyOf(diag)] = true

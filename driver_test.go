@@ -86,3 +86,40 @@ func TestRunDropsDiagnosticsInGeneratedFiles(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, report.Diagnostics, "generated-file findings are dropped")
 }
+
+// TestSourceOnlyScopeDropsTestFileFindings pins the test-file policy: a rule
+// about production design reports in source and stays silent in _test.go, while
+// an unscoped rule reports in both.
+func TestSourceOnlyScopeDropsTestFileFindings(t *testing.T) {
+	t.Parallel()
+
+	fset := token.NewFileSet()
+	source := fset.AddFile("/pkg/thing.go", -1, 100).Pos(0)
+	test := fset.AddFile("/pkg/thing_test.go", -1, 100).Pos(0)
+	reported := []analysis.Diagnostic{{Pos: source, Message: "in source"}, {Pos: test, Message: "in test"}}
+
+	scoped := goyze.Registration{Name: "shape", Analyzer: &analysis.Analyzer{Name: "shape"}}.
+		WithTestScope(goyze.TestScopeSourceOnly)
+	unscoped := goyze.Registration{Name: "any", Analyzer: &analysis.Analyzer{Name: "any"}}
+	driver := func([]goyze.Registration, []goyze.Pattern) (*token.FileSet, []goyze.DriverResult, error) {
+		return fset, []goyze.DriverResult{
+			{Registration: scoped, Diagnostics: reported},
+			{Registration: unscoped, Diagnostics: reported},
+		}, nil
+	}
+
+	report, err := goyze.Run(driver, []goyze.Registration{scoped, unscoped}, []goyze.Pattern{"."})
+
+	require.NoError(t, err)
+	byRule := map[string][]string{}
+	for _, d := range report.Diagnostics {
+		byRule[d.Rule] = append(byRule[d.Rule], d.Path)
+	}
+	assert.Equal(t, []string{"/pkg/thing.go"}, byRule["yze/shape"], "source-only drops the test-file finding")
+	assert.Equal(
+		t,
+		[]string{"/pkg/thing.go", "/pkg/thing_test.go"},
+		byRule["yze/any"],
+		"an unscoped rule reports in both",
+	)
+}

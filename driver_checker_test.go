@@ -206,7 +206,8 @@ func TestDriveWithFailsWhenRootActionErrs(t *testing.T) {
 	}
 
 	_, _, err := driveWith(
-		loadOf(&packages.Package{Fset: token.NewFileSet()}), analyze, []Registration{regWith(a)}, []Pattern{"./..."})
+		loadOf(&packages.Package{Fset: token.NewFileSet()}), analyze, []Registration{regWith(a)}, []Pattern{"./..."},
+	)
 
 	require.ErrorIs(t, err, ErrAnalyzer)
 	require.ErrorIs(t, err, runErr, "the analyzer's own Run error must stay matchable through the sentinel")
@@ -230,7 +231,8 @@ func TestDriveWithFailsWhenDependencyActionErrs(t *testing.T) {
 
 	_, _, err := driveWith(
 		loadOf(&packages.Package{Fset: token.NewFileSet()}),
-		analyze, []Registration{regWith(root.Analyzer)}, []Pattern{"./..."})
+		analyze, []Registration{regWith(root.Analyzer)}, []Pattern{"./..."},
+	)
 
 	require.ErrorIs(t, err, ErrAnalyzer)
 	require.ErrorIs(t, err, depErr, "the failed dependency's own error is the cause")
