@@ -49,19 +49,47 @@ func validateAll(regs []Registration) error {
 	return nil
 }
 
+// diagnosticKey identifies a finding for deduplication. The loader presents a
+// package's non-test files in both the plain package and its test variant (see
+// defaultLoad), so an analyzer reporting on those files produces the identical
+// finding once per variant; without this the same line is reported twice.
+type diagnosticKey struct {
+	rule    string
+	path    string
+	message string
+	line    int
+	col     int
+}
+
+// keyOf projects a diagnostic onto its identity for deduplication.
+func keyOf(d Diagnostic) diagnosticKey {
+	return diagnosticKey{rule: d.Rule, path: d.Path, message: d.Message, line: d.Line, col: d.Col}
+}
+
 // collect normalizes every driver result's diagnostics into one Report,
-// dropping findings in generated files (see generated.go).
+// dropping findings in generated files (see generated.go) and collapsing the
+// duplicates the test-variant load produces.
 func collect(fset *token.FileSet, results []DriverResult) Report {
 	report := Report{}
 	generated := generatedFiles{read: osReadHead, seen: map[filePath]bool{}}
+	seen := map[diagnosticKey]bool{}
 	for _, res := range results {
-		for _, d := range res.Diagnostics {
-			diag := ToDiagnostic(fset, res.Registration, d)
-			if generated.isGenerated(filePath(diag.Path)) {
-				continue
-			}
-			report.Diagnostics = append(report.Diagnostics, diag)
-		}
+		report.Diagnostics = append(report.Diagnostics, kept(fset, res, generated, seen)...)
 	}
 	return report
+}
+
+// kept normalizes one driver result's diagnostics, skipping generated files and
+// findings already reported by another package variant.
+func kept(fset *token.FileSet, res DriverResult, generated generatedFiles, seen map[diagnosticKey]bool) []Diagnostic {
+	out := make([]Diagnostic, 0, len(res.Diagnostics))
+	for _, d := range res.Diagnostics {
+		diag := ToDiagnostic(fset, res.Registration, d)
+		if generated.isGenerated(filePath(diag.Path)) || seen[keyOf(diag)] {
+			continue
+		}
+		seen[keyOf(diag)] = true
+		out = append(out, diag)
+	}
+	return out
 }

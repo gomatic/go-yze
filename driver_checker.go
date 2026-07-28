@@ -45,9 +45,19 @@ func CheckerDriver(regs []Registration, patterns []Pattern) (*token.FileSet, []D
 // requires, plus module identity (NeedModule) so analyzers can distinguish the
 // analyzed module's own types from foreign ones (ptrparam's foreign-convention
 // rule reads pass.Module).
+//
+// Tests:true is REQUIRED, not an optimization. Without it the loader presents
+// only each package's non-test files, so every analyzer that inspects _test.go
+// files — errtest, testfile, errtested, invariant — sees an empty test surface
+// and can never report anything. They shipped as gating analyzers that were
+// silently incapable of failing; verified by a fixture whose banned
+// error-expectation shape the standalone analyzer reports and the suite driver
+// did not. It is also what makes deduplication in collect necessary: a
+// package's non-test files appear in BOTH the plain package and its test
+// variant, so an analyzer reporting on them fires once per variant.
 func defaultLoad(patterns []Pattern) ([]*packages.Package, error) {
 	return packages.Load(
-		&packages.Config{Mode: packages.LoadAllSyntax | packages.NeedModule},
+		&packages.Config{Mode: packages.LoadAllSyntax | packages.NeedModule, Tests: true},
 		patternStrings(patterns)...,
 	)
 }

@@ -1,6 +1,7 @@
 package goyze
 
 import (
+	"fmt"
 	"go/token"
 	"testing"
 
@@ -315,6 +316,24 @@ func TestCheckerDriverRunsRealAnalyzerOverThisPackage(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, fset)
-	require.Len(t, results, 1)
-	assert.NotEmpty(t, results[0].Diagnostics)
+
+	// The loader runs with Tests:true, so one pattern yields several package
+	// variants — the plain package, its internal-test variant, the external
+	// test package, and the generated test main. Every variant is analyzed,
+	// which is exactly what makes test-file analyzers able to fire at all.
+	require.Greater(t, len(results), 1, "each package variant is analyzed")
+	for _, result := range results {
+		assert.NotEmpty(t, result.Diagnostics, "every variant reports")
+	}
+
+	// collect collapses the duplicates those variants produce, so the reported
+	// finding appears once per distinct position rather than once per variant.
+	report := collect(fset, results)
+	positions := map[string]int{}
+	for _, d := range report.Diagnostics {
+		positions[fmt.Sprintf("%s:%d:%d", d.Path, d.Line, d.Col)]++
+	}
+	for at, count := range positions {
+		assert.Equal(t, 1, count, "duplicate diagnostic at %s", at)
+	}
 }
