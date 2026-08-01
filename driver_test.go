@@ -123,3 +123,44 @@ func TestSourceOnlyScopeDropsTestFileFindings(t *testing.T) {
 		"an unscoped rule reports in both",
 	)
 }
+
+// TestKeyOfCollapsesTheDuplicateTheTestVariantLoadProduces names keyOf's and
+// diagnosticKey's claim. Because the loader presents a package's non-test files
+// in both the plain package and its test variant (see defaultLoad), an analyzer
+// reporting on those files fires once per variant — so without this projection
+// every such finding is printed twice, and a reviewer counting findings sees
+// double the real number.
+//
+// The projection must be on rule+path+line+col+message together: collapsing on
+// anything coarser would swallow a genuinely distinct second finding on the
+// same line, which is the failure that would make the deduplication itself a
+// bug.
+func TestDiagnosticKeyOfCollapsesTheDuplicateTheTestVariantLoadProduces(t *testing.T) {
+	t.Parallel()
+	want, must := assert.New(t), require.New(t)
+
+	fset, f := newFile(t)
+	// Three findings on one file: two share a line and differ only in column,
+	// two share a position and differ only in message. Emitting the SAME slice
+	// from two driver results reproduces exactly what the test-variant load
+	// does — the identical finding arriving twice.
+	found := []analysis.Diagnostic{
+		{Pos: f.Pos(0), Message: "boom"},
+		{Pos: f.Pos(5), Message: "boom"},
+		{Pos: f.Pos(0), Message: "different finding"},
+	}
+	results := []goyze.DriverResult{
+		{Registration: sampleRegistration(), Diagnostics: found},
+		{Registration: sampleRegistration(), Diagnostics: found},
+	}
+
+	report, err := goyze.Run(
+		fakeDriver(fset, results, nil),
+		[]goyze.Registration{sampleRegistration()},
+		[]goyze.Pattern{"./..."},
+	)
+
+	must.NoError(err)
+	want.Len(report.Diagnostics, 3,
+		"the identical finding collapses across variants; a different column or message does not")
+}

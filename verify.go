@@ -70,14 +70,21 @@ func issueFile(pos issuePos) string {
 type Verifier func(patterns []Pattern) (VerifyResult, error)
 
 // CheckerVerifier is the default Verifier: it reloads the patterns through
-// packages.Load with Tests set, so _test.go files — which analysis drivers do
-// not load — are type-checked too, and collects every package error.
+// packages.Load with Tests set and collects every package error.
+//
+// This is a different question from the one the analysis driver answers.
+// defaultLoad also sets Tests (it must — see the comment there), but it loads
+// in order to RUN analyzers; this loads in order to establish that the tree
+// still TYPE-CHECKS after fixes rewrote it. An applied fix that breaks a
+// _test.go caller is invisible to an analyzer pass and fatal to the build.
 func CheckerVerifier(patterns []Pattern) (VerifyResult, error) {
 	return verifyWith(verifyLoad, patterns)
 }
 
 // verifyLoad loads the patterns with full syntax/type information plus their
-// test files, which is what surfaces breakage in _test.go callers.
+// test files, which is what surfaces breakage a fix introduced in a _test.go
+// caller — the one place a rewrite can break the build without any analyzer
+// having an opinion about it.
 func verifyLoad(patterns []Pattern) ([]*packages.Package, error) {
 	return packages.Load(&packages.Config{Mode: packages.LoadAllSyntax, Tests: true}, patternStrings(patterns)...)
 }

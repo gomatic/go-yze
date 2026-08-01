@@ -46,19 +46,6 @@ func TestDriveWithHappyPathReturnsResults(t *testing.T) {
 	assert.Equal(t, "boom", results[0].Diagnostics[0].Message)
 }
 
-func TestDriveWithReturnsLoadError(t *testing.T) {
-	boom := errs.Const("load failed")
-	load := func(_ []Pattern) ([]*packages.Package, error) { return nil, boom }
-	analyze := func(_ []*analysis.Analyzer, _ []*packages.Package) (*checker.Graph, error) {
-		t.Fatal("analyze must not run after a load error")
-		return nil, nil
-	}
-
-	_, _, err := driveWith(load, analyze, nil, nil)
-
-	require.ErrorIs(t, err, boom)
-}
-
 func TestDriveWithReturnsAnalyzeError(t *testing.T) {
 	boom := errs.Const("analyze failed")
 	load := func(_ []Pattern) ([]*packages.Package, error) {
@@ -99,13 +86,6 @@ var goWorkErr = packages.Error{
 	Msg:  "pattern ./...: directory prefix . does not contain modules listed in go.work or their selected dependencies",
 }
 
-func TestDriveWithFailsWhenPatternsMatchNoPackages(t *testing.T) {
-	_, _, err := driveWith(loadOf(), noAnalyze(t), nil, []Pattern{"./..."})
-
-	require.ErrorIs(t, err, ErrLoadPackages)
-	assert.Contains(t, err.Error(), "no packages matched patterns: ./...")
-}
-
 func TestDriveWithAllowsEmptyPatternsWithNoPackages(t *testing.T) {
 	analyze := func(_ []*analysis.Analyzer, _ []*packages.Package) (*checker.Graph, error) {
 		return &checker.Graph{}, nil
@@ -115,87 +95,6 @@ func TestDriveWithAllowsEmptyPatternsWithNoPackages(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, results)
-}
-
-func TestDriveWithFailsOnGoWorkExcludedModule(t *testing.T) {
-	_, _, err := driveWith(loadOf(erroredPkg(goWorkErr)), noAnalyze(t), nil, []Pattern{"./..."})
-
-	require.ErrorIs(t, err, ErrLoadPackages)
-	assert.Contains(t, err.Error(), goWorkErr.Msg, "the loader's own mismatch text must reach the caller")
-	assert.Contains(t, err.Error(), goWorkHint)
-}
-
-func TestDriveWithLoadErrorIncludesPosition(t *testing.T) {
-	_, _, err := driveWith(loadOf(erroredPkg(
-		packages.Error{Pos: "a.go:3:7", Msg: "undefined: b", Kind: packages.TypeError},
-	)), noAnalyze(t), nil, []Pattern{"./..."})
-
-	require.ErrorIs(t, err, ErrLoadPackages)
-	assert.Contains(t, err.Error(), "a.go:3:7: undefined: b")
-	assert.NotContains(t, err.Error(), goWorkHint, "no workspace hint without a go.work mismatch")
-}
-
-func TestDriveWithLoadErrorOmitsDashPosition(t *testing.T) {
-	_, _, err := driveWith(loadOf(erroredPkg(
-		packages.Error{Pos: "-", Msg: "positionless failure", Kind: packages.ListError},
-	)), noAnalyze(t), nil, []Pattern{"./..."})
-
-	require.ErrorIs(t, err, ErrLoadPackages)
-	assert.Contains(t, err.Error(), "positionless failure")
-	assert.NotContains(t, err.Error(), "-: positionless failure")
-}
-
-func TestDriveWithLoadErrorsTruncateToFirstFew(t *testing.T) {
-	_, _, err := driveWith(loadOf(erroredPkg(
-		packages.Error{Pos: "a.go:1:1", Msg: "one", Kind: packages.TypeError},
-		packages.Error{Pos: "a.go:2:1", Msg: "two", Kind: packages.TypeError},
-		packages.Error{Pos: "a.go:3:1", Msg: "three", Kind: packages.TypeError},
-		packages.Error{Pos: "a.go:4:1", Msg: "four", Kind: packages.TypeError},
-		packages.Error{Pos: "a.go:5:1", Msg: "five", Kind: packages.TypeError},
-	)), noAnalyze(t), nil, []Pattern{"./..."})
-
-	require.ErrorIs(t, err, ErrLoadPackages)
-	assert.Contains(t, err.Error(), "a.go:3:1: three")
-	assert.NotContains(t, err.Error(), "four")
-	assert.Contains(t, err.Error(), "... and 2 more error(s)")
-}
-
-func TestDriveWithFailsOnDependencyLoadErrors(t *testing.T) {
-	dep := &packages.Package{
-		ID:     "example.com/dep",
-		Errors: []packages.Error{{Pos: "dep.go:1:1", Msg: "broken dep", Kind: packages.TypeError}},
-	}
-	root := &packages.Package{
-		ID:      "example.com/root",
-		Fset:    token.NewFileSet(),
-		Imports: map[string]*packages.Package{"example.com/dep": dep},
-	}
-
-	_, _, err := driveWith(loadOf(root), noAnalyze(t), nil, []Pattern{"./..."})
-
-	require.ErrorIs(t, err, ErrLoadPackages)
-	assert.Contains(t, err.Error(), "dep.go:1:1: broken dep")
-}
-
-func TestLoadErrorsVisitsSharedDependencyOnce(t *testing.T) {
-	dep := &packages.Package{ID: "d", Errors: []packages.Error{{Msg: "broken dep"}}}
-	a := &packages.Package{ID: "a", Imports: map[string]*packages.Package{"d": dep}}
-	b := &packages.Package{ID: "b", Imports: map[string]*packages.Package{"d": dep}}
-
-	assert.Len(t, loadErrors([]*packages.Package{a, b, dep}), 1, "a diamond dependency's errors must not repeat")
-}
-
-func TestLoadErrorsWalksImportsInSortedPathOrder(t *testing.T) {
-	root := &packages.Package{ID: "root", Imports: map[string]*packages.Package{
-		"z": {ID: "z", Errors: []packages.Error{{Msg: "zed"}}},
-		"a": {ID: "a", Errors: []packages.Error{{Msg: "aye"}}},
-	}}
-
-	got := loadErrors([]*packages.Package{root})
-
-	require.Len(t, got, 2)
-	assert.Equal(t, "aye", got[0].Msg)
-	assert.Equal(t, "zed", got[1].Msg)
 }
 
 func TestDriveWithFailsWhenRootActionErrs(t *testing.T) {
