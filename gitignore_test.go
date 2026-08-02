@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -100,7 +101,8 @@ func TestGitCheckIgnoreEmptyInput(t *testing.T) {
 // TestGitCheckIgnoreAgainstARealRepo drives the default check over a real git
 // repository: a file matched by .gitignore is reported, a tracked file is not.
 func TestGitCheckIgnoreAgainstARealRepo(t *testing.T) {
-	dir := t.TempDir()
+	dir, symErr := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, symErr)
 	run := func(args ...string) {
 		cmd := exec.Command("git", args...)
 		cmd.Dir = dir
@@ -111,17 +113,29 @@ func TestGitCheckIgnoreAgainstARealRepo(t *testing.T) {
 	require.NoError(t, os.WriteFile(dir+"/ignored.go", []byte("package x\n"), 0o644))
 	require.NoError(t, os.WriteFile(dir+"/tracked.go", []byte("package x\n"), 0o644))
 
-	ignored, err := gitCheckIgnoreIn(workDir(dir), []string{dir + "/ignored.go", dir + "/tracked.go"})
+	// An out-of-tree file (build/module cache, another repo) is included: the
+	// check must silently drop it rather than let git's fatal "outside
+	// repository" error fail the whole invocation.
+	outside := t.TempDir() + "/elsewhere.go"
+	ignored, err := gitCheckIgnoreIn(workDir(dir), []string{dir + "/ignored.go", dir + "/tracked.go", outside})
 
 	require.NoError(t, err)
 	assert.True(t, ignored[dir+"/ignored.go"], "the .gitignore-matched file is ignored")
 	assert.False(t, ignored[dir+"/tracked.go"], "the tracked file is not ignored")
+	assert.False(t, ignored[outside], "an out-of-tree file is dropped from the query, never ignored")
 
 	// Querying only tracked files: git check-ignore exits 1 (nothing ignored),
 	// which is a clean empty answer, not a failure.
 	none, noneErr := gitCheckIgnoreIn(workDir(dir), []string{dir + "/tracked.go"})
 	require.NoError(t, noneErr)
 	assert.Empty(t, none, "an exit-1 'nothing ignored' is an empty set, not an error")
+
+	// A path that is lexically under the tree but resolves outside it (via ..)
+	// passes the prefix filter yet makes git check-ignore fail fatally; the
+	// error is surfaced so the caller fails open rather than trusting a partial
+	// answer.
+	_, escapeErr := gitCheckIgnoreIn(workDir(dir), []string{dir + "/../escape.go"})
+	assert.Error(t, escapeErr, "a check-ignore fatal error is surfaced, not swallowed")
 }
 
 // TestGitCheckIgnoreOutsideARepoFailsOpen pins that a path in no git
@@ -135,6 +149,38 @@ func TestGitCheckIgnoreOutsideARepoFailsOpen(t *testing.T) {
 	_, err := gitCheckIgnoreIn(workDir(dir), []string{dir + "/x.go"})
 
 	assert.Error(t, err, "check-ignore outside a repo is a real failure, not 'nothing ignored'")
+}
+
+// TestFilesUnderKeepsOnlyInTreePaths pins the in-tree filter that keeps git
+// check-ignore from failing on the build- and module-cache paths packages.Load
+// mixes in.
+func TestFilesUnderKeepsOnlyInTreePaths(t *testing.T) {
+	t.Parallel()
+
+	kept := filesUnder("/repo", []string{
+		"/repo/a.go",
+		"/repo/sub/b.go",
+		"/cache/go-build/x-d",
+		"/reponot/c.go",
+	})
+
+	assert.Equal(t, []string{"/repo/a.go", "/repo/sub/b.go"}, kept,
+		"only paths under the root's directory tree survive; a sibling prefix does not")
+}
+
+// TestGitCheckIgnoreOnlyQueriesInTreeFiles pins that an input list of only
+// out-of-tree files yields an empty answer without a git failure — the
+// synthetic test-main packages must not fail the filter open.
+func TestGitCheckIgnoreOnlyQueriesInTreeFiles(t *testing.T) {
+	dir := t.TempDir()
+	cmd := exec.Command("git", "init", "-q")
+	cmd.Dir = dir
+	require.NoError(t, cmd.Run())
+
+	ignored, err := gitCheckIgnoreIn(workDir(dir), []string{t.TempDir() + "/cache.go"})
+
+	require.NoError(t, err, "an all-out-of-tree query is empty, not a failure")
+	assert.Empty(t, ignored)
 }
 
 // TestExitCodeClassifiesErrors pins the exit-code extraction: nil is 0, an

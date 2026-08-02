@@ -40,19 +40,36 @@ type workDir string
 // gitCheckIgnoreIn runs the check from a specific working directory, so a test
 // can drive it against an isolated repository. An empty dir uses the process
 // working directory.
+//
+// Only files UNDER the repository's work tree are queried. packages.Load with
+// Tests:true synthesizes test-main packages whose Go files live in the build
+// cache, and dependency packages whose files live in the module cache — both
+// outside the tree. git check-ignore treats an out-of-tree path as a fatal
+// error and fails the whole invocation, so an unfiltered call would 128-fail
+// on every repo with tests and fail open, defeating the filter. An out-of-tree
+// file lies outside every .gitignore's reach, so dropping it from the query
+// changes no answer.
 func gitCheckIgnoreIn(dir workDir, files []string) (map[string]bool, error) {
 	if len(files) == 0 {
 		return map[string]bool{}, nil
 	}
+	root, err := gitToplevel(dir)
+	if err != nil {
+		return nil, err
+	}
+	inTree := filesUnder(root, files)
+	if len(inTree) == 0 {
+		return map[string]bool{}, nil
+	}
 	cmd := exec.Command("git", "check-ignore", "--stdin", "-z")
 	cmd.Dir = string(dir)
-	cmd.Stdin = strings.NewReader(strings.Join(files, "\x00"))
+	cmd.Stdin = strings.NewReader(strings.Join(inTree, "\x00"))
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	// git check-ignore exits 1 when NOTHING is ignored and 128 on a real
 	// failure (not a repository, git missing). Only 0 and 1 are meaningful
 	// answers; anything else is surfaced so the caller can fail open.
-	err := cmd.Run()
+	err = cmd.Run()
 	if code, ok := exitCode(err); ok && code == 1 {
 		return map[string]bool{}, nil
 	}
@@ -60,6 +77,33 @@ func gitCheckIgnoreIn(dir workDir, files []string) (map[string]bool, error) {
 		return nil, err
 	}
 	return ignoredSet(out.Bytes()), nil
+}
+
+// repoRoot is the absolute path of a git work tree's top level.
+type repoRoot string
+
+// gitToplevel resolves the work-tree root of the repository containing dir. A
+// dir in no repository is a real error, which the caller turns into fail-open.
+func gitToplevel(dir workDir) (repoRoot, error) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	cmd.Dir = string(dir)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return repoRoot(strings.TrimSpace(string(out))), nil
+}
+
+// filesUnder keeps the files lying within root's directory tree.
+func filesUnder(root repoRoot, files []string) []string {
+	prefix := string(root) + "/"
+	kept := make([]string, 0, len(files))
+	for _, f := range files {
+		if strings.HasPrefix(f, prefix) {
+			kept = append(kept, f)
+		}
+	}
+	return kept
 }
 
 // exitCode extracts a command's process exit code, reporting whether err is an
