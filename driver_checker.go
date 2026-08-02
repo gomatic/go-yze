@@ -86,6 +86,7 @@ func driveWith(
 	if err != nil {
 		return nil, nil, err
 	}
+	pkgs = filterIgnoredPackages(gitCheckIgnore, pkgs)
 	if err = validateLoad(patterns, pkgs); err != nil {
 		return nil, nil, err
 	}
